@@ -3,7 +3,10 @@
 //! Rust character device sample.
 
 use kernel::prelude::*;
+use kernel::sync::Mutex;
 use kernel::{chrdev, file};
+
+const GLOBALMEM_SIZE: usize = 0x1000;
 
 module! {
     type: RustChrdev,
@@ -13,12 +16,40 @@ module! {
     license: "GPL",
 }
 
-struct RustFile;
+static GLOBALMEM_BUF: Mutex<[u8;GLOBALMEM_SIZE]> = unsafe {
+    Mutex::new([0u8;GLOBALMEM_SIZE])
+};
+
+struct RustFile {
+    inner: &'static Mutex<[u8;GLOBALMEM_SIZE]>,
+}
 
 #[vtable]
 impl file::Operations for RustFile {
-    fn open(_shared: &(), _file: &file::File) -> Result {
-        Ok(())
+    type Data = Box<Self>;
+
+    fn open(_shared: &(), _file: &file::File) -> Result<Box<Self>> {
+        Ok(
+            Box::try_new(RustFile {
+                inner: &GLOBALMEM_BUF
+            })?
+        )
+    }
+
+    fn write(this: &Self,_file: &file::File,reader: &mut impl kernel::io_buffer::IoBufferReader,_offset:u64,) -> Result<usize> {
+        let total_size = reader.len();
+        let buf = &mut this.inner.lock()[0..total_size];
+        reader.read_slice(buf)?;
+        Ok(total_size)
+    }
+
+    fn read(this: &Self,_file: &file::File,writer: &mut impl kernel::io_buffer::IoBufferWriter,offset:u64,) -> Result<usize> {
+        let buf = &mut this.inner.lock()[..writer.len()];
+        if (offset as usize) >= GLOBALMEM_SIZE {
+            return Ok(0);
+        }
+        writer.write_slice(buf)?;
+        Ok(buf.len())
     }
 }
 

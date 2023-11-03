@@ -1,6 +1,6 @@
 #!/bin/sh
 busybox_folder="../busybox-1.36.1"
-kernel_image="../linux/arch/x86/boot/bzImage"
+kernel_image="../linux/build/arch/x86/boot/bzImage"
 work_dir=$PWD
 rootfs="rootfs"
 rootfs_img=$PWD"/rootfs_img"
@@ -24,6 +24,7 @@ echo "#!/bin/sh" > etc/init.d/rcS
 echo "mount -t proc none /proc" >> etc/init.d/rcS
 echo "mount -t sysfs none /sys" >> etc/init.d/rcS
 echo "/sbin/mdev -s" >> etc/init.d/rcS
+echo "mknod /dev/cicv c 248 0" >> etc/init.d/rcS
 chmod +x etc/init.d/rcS
 if [ -f $rootfs_img ]; then
     rm $rootfs_img
